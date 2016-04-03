@@ -1,0 +1,301 @@
+#!/bin/sh
+
+# Copyright (C) 2016 Thierry Rascle <thierr26@free.fr>
+# Unlicense license. Please refer to the LICENSE file.
+
+# -----------------------------------------------------------------------------
+
+# Prepends the argument with "FATAL ERROR: " and echoes it to standard error,
+# then terminates the script with exit status 1. If no argument or empty
+# argument given, echoes "FATAL_ERROR" to standard error then terminates the
+# script with exit status 1.
+#
+# ARGUMENT:
+# $1: Any string.
+fatal() {
+
+    local FATAL_ERROR="FATAL ERROR";
+    if [ $# -gt 0 ] && [ -n "$1" ]; then
+        echo "$FATAL_ERROR: $1">&2;
+    else
+        echo "$FATAL_ERROR">&2;
+    fi;
+    echo "Use \"$SCRIPT_PATH --help\" for documentation">&2;
+
+    exit 1;
+}
+
+# -----------------------------------------------------------------------------
+
+# Echoes the first argument being an executable command. Echoes nothing if none
+# of the arguments is an executable command.
+#
+# ARGUMENTS:
+# Any strings.
+echo_cmd() {
+    until [ $# -eq 0 ] || command -v "$1"; do
+        shift;
+    done;
+}
+
+# -----------------------------------------------------------------------------
+
+# Echoes the first argument being an executable command and returns with exit
+# status 0. If none of the arguments is an executable command, then terminates
+# the script with a call to function fatal and thus exit status 1.
+#
+# ARGUMENTS:
+# Any strings.
+echo_cmd_fatal() {
+
+    local LAST_CMD;
+    until [ $# -eq 0 ] || command -v "$1"; do
+        LAST_CMD="$1";
+        shift;
+    done;
+
+    if [ $# -eq 0 ]; then
+        if [ -n "$LAST_CMD" ]; then
+            fatal "$LAST_CMD does not seem to be installed.";
+        else
+            fatal;
+        fi;
+    fi;
+}
+
+# -----------------------------------------------------------------------------
+
+# Prints the documentation for the script to the standard output.
+#
+# ARGUMENT
+# $1: Script name.
+documentation() {
+
+    local SCRIPT_NAME="$1";
+    local FMT="fmt";
+    local CMD=$(echo_cmd_fatal "$FMT" cat);
+    if [ ${CMD##*/} = "$FMT" ] && [ -n "$(echo_cmd tput)" ]; then
+        CMD="fmt --width=$(tput cols)";
+    fi;
+
+    $CMD <<EOF
+Usage:
+
+    $SCRIPT_NAME ARCHIVE_FILE
+
+    $SCRIPT_NAME -h|--help
+
+Description:
+
+    List the content of an archive file.
+
+    The argument is the path to the archive file.
+
+    The command used to list the content of the archive file depends on the \
+extension of the file:
+
+        - A ".tar" extension causes a "tar -tvf" command to be used.
+
+        - A ".tar.gz" extension causes a "tar -tzvf" command to be used.
+
+        - A ".tgz" extension causes a "tar -tzvf" command to be used.
+
+        - A ".tar.Z" extension causes a "tar -tZvf" command to be used.
+
+        - A ".tar.bz2" extension causes a "tar -tjvf" command to be used.
+
+        - A ".tbz2" extension causes a "tar -tjvf" command to be used.
+
+        - A ".tar.lzma" extension causes a "tar -t --lzma -vf" command to be \
+used.
+
+        - A ".tlz" extension causes a "tar -t --lzma -vf" command to be used.
+
+        - A ".tar.xz" extension causes a "tar -t --xz -vf" command to be used.
+
+        - A ".tar.lzo" extension causes a "tar -t --lzop -vf" command to be \
+used.
+
+        - A ".tar.lzip" extension causes a "tar -t --lzip -vf" command to be \
+used.
+
+        - A ".zip" extension causes an "unzip -lv" command to be used.
+
+    $SCRIPT_NAME does not check that the needed archiver and decompressor \
+programs are actually installed on the system before attempting to list the \
+content of the archive file.  Thus, the command issued to list the content of \
+the archive file may fail.
+
+Options:
+
+    -h, --help
+        Display this documentation and exit.
+EOF
+}
+
+# -----------------------------------------------------------------------------
+
+# Returns 0 if the argument starts with "-". Returns 1 otherwise.
+#
+# ARGUMENT
+# $1: Any string.
+has_hyphen_leader() {
+    if [ -n "$1" ] && [ -z "${1%%-*}" ]; then
+        return 0;
+    else
+        return 1;
+    fi;
+}
+
+# -----------------------------------------------------------------------------
+
+# Returns 0 if the argument starts with "--". Returns 1 otherwise.
+#
+# ARGUMENT
+# $1: Any string.
+has_double_hyphen_leader() {
+    if [ -n "$1" ] && [ -z ${1%%--*} ]; then
+        return 0;
+    else
+        return 1;
+    fi;
+}
+
+# -----------------------------------------------------------------------------
+
+# Is supposed to be called with all the arguments to the current script.
+#
+# Affects the following variables:
+#   HELP_OPT:                 true if the user has requested the printing of
+#                             the script documentation, false otherwise.
+#   ARCHIVE_FILE:             First argument to the script.
+#
+# An unrecognized option or an invalid argument will cause the script to
+# terminate with a call to the fatal function and thus exit status 1.
+#
+# ARGUMENTS
+# All the arguments to the current script.
+process_args() {
+
+    HELP_OPT=false;
+
+    # Process the options.
+    local OPT_STRING;
+    local N;
+    local K;
+    local OPT;
+    local OPT_PROCESSED=false;
+    while ! $OPT_PROCESSED && [ $# -gt 0 ] \
+            && has_hyphen_leader "$1" \
+            && [ "$1" != "-" ]; do
+
+        OPT_STRING=${1#?}; # If $1 is "-abc" then $OPT_STRING is "abc".
+                           # If $1 is "--force" then $OPT_STRING is "-force".
+
+        if has_double_hyphen_leader "$1"; then
+            N=1;
+        else
+            N=${#OPT_STRING};
+        fi;
+
+        for K in $(seq 1 $N); do
+            if [ $N -gt 1 ]; then
+                OPT=${OPT_STRING%${OPT_STRING#?}}; # If $OPT_STRING is "abc" at
+                                                   # the beginning of the loop,
+                                                   # then $OPT is "a",
+                                                   # then "b", then "c".
+            else
+                OPT="$OPT_STRING";
+            fi;
+
+            case "-$OPT" in
+                --) OPT_PROCESSED=true;;
+                -h|--help) HELP_OPT=true;;
+                *) fatal "Unrecognized option: -$OPT"
+            esac;
+
+            if [ $N -gt 1 ]; then
+                OPT_STRING=${OPT_STRING#?};
+            fi;
+        done;
+
+        shift;
+    done;
+
+    # Process the other arguments.
+    if [ $# -eq 0 ] && ! $HELP_OPT; then
+        fatal "Argument missing."
+    fi;
+    if ! $HELP_OPT; then
+        if [ $# -gt 1 ]; then
+            fatal "Too many arguments."
+        fi;
+        if [ -z "$1" ]; then
+            fatal "The first argument must not be an empty string."
+        fi;
+        if ! [ -f "$1" ]; then
+            fatal "Cannot find file "$1".";
+        else
+            ARCHIVE_FILE="$1";
+        fi;
+    fi;
+}
+
+# -----------------------------------------------------------------------------
+
+set -o nounset # Causes the script to terminate whenever an uninitialized
+               # variable is used.
+
+set -o errexit # Causes the script to terminate whenever a statement returns a
+               # non-true value.
+
+# Get the path to the script.
+SCRIPT_PATH="$0";
+
+# Get the base name of the script.
+SCRIPT_BASE_NAME=$(basename "$SCRIPT_PATH");
+
+process_args "$@";
+
+if $HELP_OPT; then
+    documentation $SCRIPT_BASE_NAME;
+else
+    ARCHIVE_EXT="$(basename "$ARCHIVE_FILE")";
+    ARCHIVE_EXT="${ARCHIVE_EXT#*.}";
+
+    if [ "$ARCHIVE_EXT" = "$(basename "$ARCHIVE_FILE")" ]; then
+        fatal "Archive file extension missing."
+    fi;
+
+    case "$ARCHIVE_EXT" in
+        tar)
+            C="tar -tvf "$ARCHIVE_FILE"";;
+        tar.gz|tgz)
+            C="tar -tzvf "$ARCHIVE_FILE"";;
+        tar.Z)
+            C="tar -tZvf "$ARCHIVE_FILE"";;
+        tar.bz2|tbz2)
+            C="tar -tjvf "$ARCHIVE_FILE"";;
+        tar.lzma|tlz)
+            C="tar -t --lzma -vf "$ARCHIVE_FILE"";;
+        tar.xz)
+            C="tar -t --xz -vf "$ARCHIVE_FILE"";;
+        tar.lzo)
+            C="tar -t --lzop -vf "$ARCHIVE_FILE"";;
+        tar.lzip)
+            C="tar -t --lzip -vf "$ARCHIVE_FILE"";;
+        zip)
+            C="unzip -lv "$ARCHIVE_FILE"";;
+        *)
+            fatal "Unsupported archive type: $ARCHIVE_EXT.";
+    esac
+
+    set +o errexit
+    $C;
+    EXIT_CODE=$?;
+    set -o errexit
+    echo;
+    if [ $EXIT_CODE -ne 0 ]; then
+        fatal "Command failed:\n$C";
+    fi;
+fi;

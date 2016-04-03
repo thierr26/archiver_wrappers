@@ -1,0 +1,207 @@
+GENERAL INFORMATION
+-------------------
+
+This repository contains shell scripts that can be used to create archive
+files, list the content of archive files and extract archive files.  They
+basically issue tar and zip / unzip commands, with the "right" flags (options)
+selected automatically.  People (like me!) who have trouble remembering tar
+syntax may find those scripts useful.
+
+The scripts are named archive, list_archive and extract_archive.  You can have
+them print their documentation by calling them with the --help option.
+
+Please read the documentations below for details.
+
+The scripts have been validated on a Debian GNU/Linux system, with dash as
+/bin/sh.
+
+DOCUMENTATION FOR SCRIPT archive
+--------------------------------
+
+Usage:
+
+    archive DIR_TO_BE_ARCHIVED
+
+    archive DIR_TO_BE_ARCHIVED DEST_DIR
+
+    archive DIR_TO_BE_ARCHIVED PATH_TO_ARCHIVE_WITH_EXTENSION
+
+    archive -h|--help
+
+Description:
+
+    Archive an entire directory (including its subdirectories).
+
+    The first argument is the path (relative or absolute) to the directory
+    to be archived.
+
+    If no other argument is provided, then the archive is created in the
+    working directory using a "tar -czvf" command.  The name of the archive
+    is the base name of the directory given as first argument.  The extension
+    of the archive is ".tgz".
+
+    If the path (relative or absolute) to a directory is provided as
+    second argument, then the archive is created in this directory using a
+    "tar -czvf" command.  The name of the archive is the base name of the
+    directory given as first argument.  The extension of the archive is
+    ".tgz".
+
+    If the path (relative or absolute) to the archive file is provided as
+    second argument, then the command used to create the archive is selected
+    based on the extension of the archive file:
+
+        - A ".tar" extension causes a "tar -cvf" command to be used.
+
+        - A ".tar.gz" extension causes a "tar -czvf" command to be used.
+
+        - A ".tgz" extension causes a "tar -czvf" command to be used.
+
+        - A ".tar.Z" extension causes a "tar -cZvf" command to be used.
+
+        - A ".tar.bz2" extension causes a "tar -cjvf" command to be used.
+
+        - A ".tbz2" extension causes a "tar -cjvf" command to be used.
+
+        - A ".tar.lzma" extension causes a "tar -c --lzma -vf" command to
+        be used.
+
+        - A ".tlz" extension causes a "tar -c --lzma -vf" command to be used.
+
+        - A ".tar.xz" extension causes a "tar -c --xz -vf" command to be used.
+
+        - A ".tar.lzo" extension causes a "tar -c --lzop -vf" command to
+        be used.
+
+        - A ".tar.lzip" extension causes a "tar -c --lzip -vf" command to
+        be used.
+
+        - A ".zip" extension causes a "zip -rv" command to be used.
+
+    In the archive, files have a path relative to the parent directory of
+    the directory to be archived.
+
+    archive does not check that the needed archiver and compressor programs
+    are actually installed on the system before attempting to create the
+    archive.  Thus, the command issued to create the archive may fail.
+
+Options:
+
+    -h, --help
+        Display this documentation and exit.
+
+DOCUMENTATION FOR SCRIPT list_archive
+-------------------------------------
+
+Usage:
+
+    list_archive ARCHIVE_FILE
+
+    list_archive -h|--help
+
+Description:
+
+    List the content of an archive file.
+
+    The argument is the path to the archive file.
+
+    The command used to list the content of the archive file depends on the
+    extension of the file:
+
+        - A ".tar" extension causes a "tar -tvf" command to be used.
+
+        - A ".tar.gz" extension causes a "tar -tzvf" command to be used.
+
+        - A ".tgz" extension causes a "tar -tzvf" command to be used.
+
+        - A ".tar.Z" extension causes a "tar -tZvf" command to be used.
+
+        - A ".tar.bz2" extension causes a "tar -tjvf" command to be used.
+
+        - A ".tbz2" extension causes a "tar -tjvf" command to be used.
+
+        - A ".tar.lzma" extension causes a "tar -t --lzma -vf" command to
+        be used.
+
+        - A ".tlz" extension causes a "tar -t --lzma -vf" command to be used.
+
+        - A ".tar.xz" extension causes a "tar -t --xz -vf" command to be used.
+
+        - A ".tar.lzo" extension causes a "tar -t --lzop -vf" command to
+        be used.
+
+        - A ".tar.lzip" extension causes a "tar -t --lzip -vf" command to
+        be used.
+
+        - A ".zip" extension causes an "unzip -lv" command to be used.
+
+    list_archive does not check that the needed archiver and decompressor
+    programs are actually installed on the system before attempting to list
+    the content of the archive file.  Thus, the command issued to list the
+    content of the archive file may fail.
+
+Options:
+
+    -h, --help
+        Display this documentation and exit.
+
+DOCUMENTATION FOR SCRIPT extract_archive
+----------------------------------------
+
+Usage:
+
+    extract_archive ARCHIVE_FILE [DESTINATION]
+
+    extract_archive -h|--help
+
+Description:
+
+    Extract an archive file.
+
+    The first argument is the path to the archive file.  If no other argument
+    is provided, then the archive file is extracted to the current working
+    directory.
+
+    The command used to extract an archive file depends on the extension of
+    the file:
+
+        - A ".tar" extension causes a "tar -xvf" command to be used.
+
+        - A ".tar.gz" extension causes a "tar -xzvf" command to be used.
+
+        - A ".tgz" extension causes a "tar -xzvf" command to be used.
+
+        - A ".tar.Z" extension causes a "tar -xZvf" command to be used.
+
+        - A ".tar.bz2" extension causes a "tar -xjvf" command to be used.
+
+        - A ".tbz2" extension causes a "tar -xjvf" command to be used.
+
+        - A ".tar.lzma" extension causes a "tar -x --lzma -vf" command to
+        be used.
+
+        - A ".tlz" extension causes a "tar -x --lzma -vf" command to be used.
+
+        - A ".tar.xz" extension causes a "tar -x --xz -vf" command to be used.
+
+        - A ".tar.lzo" extension causes a "tar -x --lzop -vf" command to
+        be used.
+
+        - A ".tar.lzip" extension causes a "tar -x --lzip -vf" command to
+        be used.
+
+        - A ".zip" extension causes an "unzip" command to be used.
+
+    extract_archive does not check that the needed archiver and decompressor
+    programs are actually installed on the system before attempting to extract
+    the archive file.  Thus, the command issued to list the content of the
+    archive file may fail.
+
+Options:
+
+    -h, --help
+        Display this documentation and exit.
+
+==============================================================================
+Author: Thierry Rascle (thierr26@free.fr)
+
+Unlicense license. Please refer to the LICENSE file.

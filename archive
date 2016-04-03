@@ -1,0 +1,410 @@
+#!/bin/sh
+
+# Copyright (C) 2016 Thierry Rascle <thierr26@free.fr>
+# Unlicense license. Please refer to the LICENSE file.
+
+# -----------------------------------------------------------------------------
+
+# Prepends the argument with "FATAL ERROR: " and echoes it to standard error,
+# then terminates the script with exit status 1. If no argument or empty
+# argument given, echoes "FATAL_ERROR" to standard error then terminates the
+# script with exit status 1.
+#
+# ARGUMENT:
+# $1: Any string.
+fatal() {
+
+    local FATAL_ERROR="FATAL ERROR";
+    if [ $# -gt 0 ] && [ -n "$1" ]; then
+        echo "$FATAL_ERROR: $1">&2;
+    else
+        echo "$FATAL_ERROR">&2;
+    fi;
+    echo "Use \"$SCRIPT_PATH --help\" for documentation">&2;
+
+    exit 1;
+}
+
+# -----------------------------------------------------------------------------
+
+# Echoes the first argument being an executable command. Echoes nothing if none
+# of the arguments is an executable command.
+#
+# ARGUMENTS:
+# Any strings.
+echo_cmd() {
+    until [ $# -eq 0 ] || command -v "$1"; do
+        shift;
+    done;
+}
+
+# -----------------------------------------------------------------------------
+
+# Echoes the first argument being an executable command and returns with exit
+# status 0. If none of the arguments is an executable command, then terminates
+# the script with a call to function fatal and thus exit status 1.
+#
+# ARGUMENTS:
+# Any strings.
+echo_cmd_fatal() {
+
+    local LAST_CMD;
+    until [ $# -eq 0 ] || command -v "$1"; do
+        LAST_CMD="$1";
+        shift;
+    done;
+
+    if [ $# -eq 0 ]; then
+        if [ -n "$LAST_CMD" ]; then
+            fatal "$LAST_CMD does not seem to be installed.";
+        else
+            fatal;
+        fi;
+    fi;
+}
+
+# -----------------------------------------------------------------------------
+
+# Prints the documentation for the script to the standard output.
+#
+# ARGUMENT
+# $1: Script name.
+documentation() {
+
+    local SCRIPT_NAME="$1";
+    local FMT="fmt";
+    local CMD=$(echo_cmd_fatal "$FMT" cat);
+    if [ ${CMD##*/} = "$FMT" ] && [ -n "$(echo_cmd tput)" ]; then
+        CMD="fmt --width=$(tput cols)";
+    fi;
+
+    $CMD <<EOF
+Usage:
+
+    $SCRIPT_NAME DIR_TO_BE_ARCHIVED
+
+    $SCRIPT_NAME DIR_TO_BE_ARCHIVED DEST_DIR
+
+    $SCRIPT_NAME DIR_TO_BE_ARCHIVED PATH_TO_ARCHIVE_WITH_EXTENSION
+
+    $SCRIPT_NAME -h|--help
+
+Description:
+
+    Archive an entire directory (including its subdirectories).
+
+    The first argument is the path (relative or absolute) to the directory to \
+be archived.
+
+    If no other argument is provided, then the archive is created in the \
+working directory using a "tar -czvf" command.  The name of the archive is \
+the base name of the directory given as first argument.  The extension of the \
+archive is ".tgz".
+
+    If the path (relative or absolute) to a directory is provided as second \
+argument, then the archive is created in this directory using a "tar -czvf" \
+command.  The name of the archive is the base name of the directory given as \
+first argument.  The extension of the archive is ".tgz".
+
+    If the path (relative or absolute) to the archive file is provided as \
+second argument, then the command used to create the archive is selected \
+based on the extension of the archive file:
+
+        - A ".tar" extension causes a "tar -cvf" command to be used.
+
+        - A ".tar.gz" extension causes a "tar -czvf" command to be used.
+
+        - A ".tgz" extension causes a "tar -czvf" command to be used.
+
+        - A ".tar.Z" extension causes a "tar -cZvf" command to be used.
+
+        - A ".tar.bz2" extension causes a "tar -cjvf" command to be used.
+
+        - A ".tbz2" extension causes a "tar -cjvf" command to be used.
+
+        - A ".tar.lzma" extension causes a "tar -c --lzma -vf" command to be \
+used.
+
+        - A ".tlz" extension causes a "tar -c --lzma -vf" command to be used.
+
+        - A ".tar.xz" extension causes a "tar -c --xz -vf" command to be used.
+
+        - A ".tar.lzo" extension causes a "tar -c --lzop -vf" command to be \
+used.
+
+        - A ".tar.lzip" extension causes a "tar -c --lzip -vf" command to be \
+used.
+
+        - A ".zip" extension causes a "zip -rv" command to be used.
+
+    In the archive, files have a path relative to the parent directory of the \
+directory to be archived.
+
+    $SCRIPT_NAME does not check that the needed archiver and compressor \
+programs are actually installed on the system before attempting to create the \
+archive.  Thus, the command issued to create the archive may fail.
+
+Options:
+
+    -h, --help
+        Display this documentation and exit.
+EOF
+}
+
+# -----------------------------------------------------------------------------
+
+# Returns 0 if the argument starts with "-". Returns 1 otherwise.
+#
+# ARGUMENT
+# $1: Any string.
+has_hyphen_leader() {
+    if [ -n "$1" ] && [ -z "${1%%-*}" ]; then
+        return 0;
+    else
+        return 1;
+    fi;
+}
+
+# -----------------------------------------------------------------------------
+
+# Returns 0 if the argument starts with "--". Returns 1 otherwise.
+#
+# ARGUMENT
+# $1: Any string.
+has_double_hyphen_leader() {
+    if [ -n "$1" ] && [ -z ${1%%--*} ]; then
+        return 0;
+    else
+        return 1;
+    fi;
+}
+
+# -----------------------------------------------------------------------------
+
+# Checks that some of the external programs needed by the script are available.
+dependency_check() {
+    echo_cmd_fatal readlink>/dev/null;
+    echo_cmd_fatal touch>/dev/null;
+}
+
+# -----------------------------------------------------------------------------
+
+# Is supposed to be called with all the arguments to the current script.
+#
+# Affects the following variables:
+#   HELP_OPT:                 true if the user has requested the printing of
+#                             the script documentation, false otherwise.
+#   DIR_TO_BE_ARCHIVED:       First argument to the script.
+#   ABS_DIR:                  Absolute path to the directory to be archived.
+#   DIR:                      Base name of the directory to be archived.
+#   PARENT:                   Parent of the the directory to be archived.
+#   ARCHIVE:                  Path to the archive file.
+#   ARCHIVE_EXT:              Extension of the archive file.
+#
+# An unrecognized option or invalid arguments will cause the script to \
+# terminate with a call to the fatal function and thus exit status 1.
+#
+# ARGUMENTS
+# All the arguments to the current script.
+process_args() {
+
+    local DEFAULT_ARCHIVE_EXT=tgz;
+    HELP_OPT=false;
+
+    dependency_check;
+
+    # Process the options.
+    local OPT_STRING;
+    local N;
+    local K;
+    local OPT;
+    local OPT_PROCESSED=false;
+    while ! $OPT_PROCESSED && [ $# -gt 0 ] \
+            && has_hyphen_leader "$1" \
+            && [ "$1" != "-" ]; do
+
+        OPT_STRING=${1#?}; # If $1 is "-abc" then $OPT_STRING is "abc".
+                           # If $1 is "--force" then $OPT_STRING is "-force".
+
+        if has_double_hyphen_leader "$1"; then
+            N=1;
+        else
+            N=${#OPT_STRING};
+        fi;
+
+        for K in $(seq 1 $N); do
+            if [ $N -gt 1 ]; then
+                OPT=${OPT_STRING%${OPT_STRING#?}}; # If $OPT_STRING is "abc" at
+                                                   # the beginning of the loop,
+                                                   # then $OPT is "a",
+                                                   # then "b", then "c".
+            else
+                OPT="$OPT_STRING";
+            fi;
+
+            case "-$OPT" in
+                --) OPT_PROCESSED=true;;
+                -h|--help) HELP_OPT=true;;
+                *) fatal "Unrecognized option: -$OPT"
+            esac;
+
+            if [ $N -gt 1 ]; then
+                OPT_STRING=${OPT_STRING#?};
+            fi;
+        done;
+
+        shift;
+    done;
+
+    # Process the other arguments.
+    if [ $# -eq 0 ] && ! $HELP_OPT; then
+        fatal "Argument missing."
+    fi;
+    if ! $HELP_OPT; then
+        if [ -z "$1" ]; then
+            fatal "The first argument must not be an empty string."
+        fi;
+
+        DIR_TO_BE_ARCHIVED="$1";
+        set +o errexit
+        ABS_DIR=$(readlink -f "$DIR_TO_BE_ARCHIVED");
+        set -o errexit
+        if [ -z "$ABS_DIR" ] || ! [ -e "$ABS_DIR" ]; then
+            fatal "Unable to find $DIR_TO_BE_ARCHIVED.";
+        fi;
+        if ! [ -d "$ABS_DIR" ]; then
+            fatal "$DIR_TO_BE_ARCHIVED is not a directory.";
+        fi;
+        if [ "$ABS_DIR" = "/" ]; then
+            fatal "Won't attempt to archive the whole file system.";
+        fi;
+        DIR="${ABS_DIR##*/}";
+        PARENT="${ABS_DIR%/$DIR}";
+
+        if [ $# -eq 2 ]; then
+            if [ -z "$2" ]; then
+                fatal "The second argument must not be an empty string."
+            fi;
+
+            ARCHIVE_EXT="$(basename "$2")";
+            ARCHIVE_EXT="${ARCHIVE_EXT#*.}";
+            if [ "$ARCHIVE_EXT" = "$(basename "$2")" ] && [ -d "$2" ]; then
+                ARCHIVE="$2/$DIR".$DEFAULT_ARCHIVE_EXT;
+            elif [ "$ARCHIVE_EXT" = "$2" ]; then
+                fatal "$2 is not a directory."
+            else
+                ARCHIVE="$2";
+            fi;
+            ARCHIVE_EXT="$(basename "$ARCHIVE")";
+            ARCHIVE_EXT="${ARCHIVE_EXT#*.}";
+            if [ "$ARCHIVE_EXT" = "$(basename "$ARCHIVE")" ]; then
+                ARCHIVE_EXT=$DEFAULT_ARCHIVE_EXT;
+                ARCHIVE="$ARCHIVE.$ARCHIVE_EXT";
+            fi;
+        elif [ $# -eq 1 ]; then
+            ARCHIVE_EXT=$DEFAULT_ARCHIVE_EXT;
+            ARCHIVE="$DIR.$ARCHIVE_EXT";
+        else
+            fatal "Too many arguments."
+        fi;
+
+    fi;
+}
+
+# -----------------------------------------------------------------------------
+
+set -o nounset # Causes the script to terminate whenever an uninitialized
+               # variable is used.
+
+set -o errexit # Causes the script to terminate whenever a statement returns a
+               # non-true value.
+
+# Get the path to the script.
+SCRIPT_PATH="$0";
+
+# Get the base name of the script.
+SCRIPT_BASE_NAME=$(basename "$SCRIPT_PATH");
+
+process_args "$@";
+
+if $HELP_OPT; then
+    documentation $SCRIPT_BASE_NAME;
+else
+    ORIGINAL_WD=$(pwd);
+    W=$(pwd);
+    DEST=;
+    case "$ARCHIVE_EXT" in
+        tar)
+            C="tar -cvf "$ARCHIVE" -C "$PARENT" "$DIR"";;
+        tar.gz|tgz)
+            C="tar -czvf "$ARCHIVE" -C "$PARENT" "$DIR"";;
+        tar.Z)
+            C="tar -cZvf "$ARCHIVE" -C "$PARENT" "$DIR"";;
+        tar.bz2|tbz2)
+            C="tar -cjvf "$ARCHIVE" -C "$PARENT" "$DIR"";;
+        tar.lzma|tlz)
+            C="tar -c --lzma -vf "$ARCHIVE" -C "$PARENT" "$DIR"";;
+        tar.xz)
+            C="tar -c --xz -vf "$ARCHIVE" -C "$PARENT" "$DIR"";;
+        tar.lzo)
+            C="tar -c --lzop -vf "$ARCHIVE" -C "$PARENT" "$DIR"";;
+        tar.lzip)
+            C="tar -c --lzip -vf "$ARCHIVE" -C "$PARENT" "$DIR"";;
+        zip)
+            set +o errexit
+            touch "$ARCHIVE" 2>/dev/null;
+            if [ $? -ne 0 ]; then
+                fatal "Cannot touch file $ARCHIVE.";
+            fi;
+            DEST=$(readlink -f "$ARCHIVE");
+            rm -f "$ARCHIVE";
+            set -o errexit
+            C="zip -rv $(basename "$ARCHIVE") "$DIR"";;
+        *)
+            fatal "Unsupported archive type: $ARCHIVE_EXT.";
+    esac
+
+    if [ -e "$ARCHIVE" ] && ! [ -f "$ARCHIVE" ]; then
+        fatal "$ARCHIVE already exists and is no regular file.";
+    fi;
+    if ! [ -e "$ARCHIVE" ]; then
+        ARCHIVE_DID_NOT_EXIST=true;
+        set +o errexit
+        touch "$ARCHIVE" 2>/dev/null;
+        if [ $? -ne 0 ]; then
+            fatal "Cannot create file $ARCHIVE.";
+        fi;
+        rm "$ARCHIVE";
+        set -o errexit
+    fi;
+
+    if [ -n "$DEST" ]; then
+        cd "$PARENT";
+        W="$PARENT";
+    fi;
+    set +o errexit
+    $C;
+    EXIT_CODE=$?;
+    set -o errexit
+    if [ $EXIT_CODE -eq 0 ] && [ -n "$DEST" ]; then
+        set +o errexit
+        mv $(basename "$ARCHIVE") "$DEST";
+        if [ $? -ne 0 ]; then
+            fatal "Cannot move $(basename "$ARCHIVE") to "$DEST".";
+        fi;
+        set -o errexit
+    fi;
+    cd "$ORIGINAL_WD";
+
+    echo;
+    if [ $EXIT_CODE -ne 0 ]; then
+        if $ARCHIVE_DID_NOT_EXIST; then
+            rm -f "$ARCHIVE";
+        fi;
+        fatal "Command failed:\n$C\nissued while working directory was $W";
+    fi;
+    echo "Sucessful command:";
+    echo "$C";
+    echo "Created archive:";
+    echo $(readlink -f "$ARCHIVE");
+fi;
