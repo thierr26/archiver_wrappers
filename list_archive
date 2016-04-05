@@ -235,9 +235,8 @@ process_args() {
         fi;
         if ! [ -f "$1" ]; then
             fatal "Cannot find file "$1".";
-        else
-            ARCHIVE_FILE="$1";
         fi;
+        ARCHIVE_FILE="$1";
     fi;
 }
 
