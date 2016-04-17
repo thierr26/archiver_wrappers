@@ -196,6 +196,7 @@ dependency_check() {
 #   DIR:                      Base name of the directory to be archived.
 #   PARENT:                   Parent of the the directory to be archived.
 #   ARCHIVE:                  Path to the archive file.
+#   ARCHIVE_BASE_NAME:        Base name of the archive file.
 #   ARCHIVE_EXT:              Extension of the archive file.
 #
 # An unrecognized option or invalid arguments will cause the script to \
@@ -304,6 +305,7 @@ process_args() {
         else
             fatal "Too many arguments."
         fi;
+        ARCHIVE_BASE_NAME="$(basename "$ARCHIVE")";
 
     fi;
 }
@@ -356,7 +358,7 @@ else
             DEST=$(readlink -f "$ARCHIVE");
             rm -f "$ARCHIVE";
             set -o errexit
-            C="zip -rv $(basename "$ARCHIVE") "$DIR"";;
+            C="zip -rv "$ARCHIVE_BASE_NAME" "$DIR"";;
         *)
             fatal "Unsupported archive type: $ARCHIVE_EXT.";
     esac
@@ -384,12 +386,14 @@ else
     EXIT_CODE=$?;
     set -o errexit
     if [ $EXIT_CODE -eq 0 ] && [ -n "$DEST" ]; then
-        set +o errexit
-        mv $(basename "$ARCHIVE") "$DEST";
-        if [ $? -ne 0 ]; then
-            fatal "Cannot move $(basename "$ARCHIVE") to "$DEST".";
-        fi;
-        set -o errexit
+        if [ "$DEST" != "$(readlink -f "$ARCHIVE_BASE_NAME")" ]; then
+            set +o errexit
+            mv "$ARCHIVE_BASE_NAME" "$DEST";
+            if [ $? -ne 0 ]; then
+                fatal "Cannot move $ARCHIVE_BASE_NAME to "$DEST".";
+            fi;
+            set -o errexit
+        fi
     fi;
     cd "$ORIGINAL_WD";
 
